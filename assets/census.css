@@ -1,0 +1,20 @@
+.gob-census { max-width: 100%; }
+.gob-census * { box-sizing: border-box; }
+.gob-census .gob-search { display:flex; flex-wrap:wrap; align-items:end; gap:.6rem; margin:1.25rem 0; }
+.gob-census .gob-search label { flex-basis:100%; font-weight:600; }
+.gob-census input, .gob-census textarea, .gob-census select { width:100%; max-width:100%; padding:.65rem; border:1px solid #777; border-radius:3px; background:#fff; color:#111; font:inherit; }
+.gob-census .gob-search input { flex:1 1 200px; }
+.gob-census button, .gob-census .gob-button { display:inline-block; width:auto; background:#111; color:#fff; padding:.7rem 1rem; border:0; border-radius:3px; cursor:pointer; font:inherit; text-decoration:none; }
+.gob-census .gob-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),1fr)); gap:1.25rem; margin:1.5rem 0; }
+.gob-census .gob-card { border:1px solid #aaa; padding:.75rem; min-width:0; }
+.gob-census .gob-card img { width:100%; aspect-ratio:1; object-fit:cover; display:block; }
+.gob-census .gob-placeholder { display:grid; place-items:center; aspect-ratio:1; background:#eee; color:#444; }
+.gob-census .gob-card h3 { font-size:1.1rem; margin:.6rem 0 .25rem; }
+.gob-census .gob-card p, .gob-census .gob-identifier { font-size:.85rem; color:inherit; opacity:.7; }
+.gob-census .gob-form form { display:grid; gap:.65rem; max-width:620px; }
+.gob-census .gob-form label { margin-top:.5rem; font-weight:600; }
+.gob-census .gob-form img { max-width:150px; height:auto; }
+.gob-census .gob-form button { margin-top:.7rem; justify-self:start; }
+.gob-census .gob-detail > img { max-width: min(100%, 720px); height:auto; }
+.gob-census .gob-pages { margin:1rem 0; display:flex; flex-wrap:wrap; gap:.65rem; }
+.gob-census .gob-notice { border-left:4px solid #17804b; padding:.6rem 1rem; background:#eaf8ef; }
