@@ -1,13 +1,19 @@
-# Guild — version 0.1.2
+# Guild — version 0.1.3
 
-The WordPress plugin and repository are named `guild`. This version changes the admin UI from separate sidebar entries to one **Guild** menu with tabs:
+## Photo-upload failure recovery
 
-- Overview
-- Records (links to the native WordPress post editor and list)
-- Item types (hierarchical terms)
-- Sets (non-hierarchical terms)
-- Storage locations (hierarchical terms)
-- Pages (mapping the existing, real WordPress pages to their shortcodes)
+This release fixes the frontend photograph failure workflow introduced in earlier versions. The previous handler saved the census record and then displayed an unrecoverable WordPress error page when a photo failed to upload.
+
+- Before submission, the form now checks the selected image size against the effective PHP/WordPress upload limit and blocks submissions that exceed it. The exact limit is shown near the image input. This browser check is advisory and is not a substitute for server-side limits.
+- If PHP or WordPress reports an upload failure *after the census record is saved*, the browser redirects to the existing record's edit page and displays an error and retry guidance. It does not create a duplicate record, and it does not replace any existing primary image on failure.
+- Removed the `capture="environment"` attribute. The form recommends taking photographs in the iOS Camera app first so a failed upload cannot destroy the sole copy. Selecting a photo from Photos is still supported.
+- Successful saves still return to the individual record page.
+
+**Server setup:** In cPanel's MultiPHP INI Editor (or applicable PHP settings), check `upload_max_filesize` and `post_max_size`; the latter must be larger than the former. Large uploads can also be constrained by web-server/WAF limits. An image above `post_max_size` may be rejected by PHP *before* the plugin receives the form, so the browser-side limit check is important. The plugin does not resize photographs automatically in this version.
+
+## Updating
+
+Install this ZIP to update the existing plugin in `wp-content/plugins/guild/`. No database changes, page changes or ID changes are needed. Existing records and settings are preserved. Test on iOS using a small photograph and then a deliberately oversized file (which should be rejected *before* submission).
 
 ## IMPORTANT: migrating from `guild-census` 0.1.1
 

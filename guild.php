@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Guild
  * Description: Private, WordPress-based census foundation with real frontend Pages and a simple mobile entry form.
- * Version: 0.1.2
+ * Version: 0.1.3
  * Requires at least: 6.4
  * Requires PHP: 8.0
  * Author: Guild of Bears
@@ -11,7 +11,7 @@
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 final class Guild_Census {
-    const VERSION = '0.1.2';
+    const VERSION = '0.1.3';
     const CPT = 'gob_item';
     const OPT_PAGES = 'gob_census_pages';
     const OPT_COUNTER = 'gob_census_counter';
@@ -346,6 +346,47 @@ final class Guild_Census {
         if ( current_user_can( 'edit_post', $post->ID ) && $form ) { echo '<p><a href="' . esc_url( add_query_arg( 'record', $id, $form ) ) . '">Edit record</a></p>'; }
         echo '</article>'; return ob_get_clean();
     }
+    private static function php_size_bytes( $value ) {
+        $value = trim( (string) $value );
+        if ( '' === $value ) { return 0; }
+        $number = (float) $value;
+        $unit = strtolower( substr( $value, -1 ) );
+        if ( 'g' === $unit ) { $number *= 1024 * 1024 * 1024; }
+        elseif ( 'm' === $unit ) { $number *= 1024 * 1024; }
+        elseif ( 'k' === $unit ) { $number *= 1024; }
+        return (int) $number;
+    }
+    private static function photo_max_bytes() {
+        $limits = array_filter( array(
+            self::php_size_bytes( ini_get( 'upload_max_filesize' ) ),
+            self::php_size_bytes( ini_get( 'post_max_size' ) ) - 1024 * 128,
+            (int) wp_max_upload_size(),
+        ), function( $n ) { return $n > 0; } );
+        return $limits ? min( $limits ) : 0;
+    }
+    private static function photo_upload_message( $code ) {
+        $messages = array(
+            'size' => 'The photograph exceeds the server upload limit. The record was saved, but the photograph was not.',
+            'partial' => 'The photograph was only partially uploaded. The record was saved.',
+            'missing' => 'No photograph was received. The record was saved.',
+            'permission' => 'Your account cannot upload photographs. The record was saved.',
+            'failed' => 'The photograph could not be uploaded. The record was saved.',
+        );
+        return isset( $messages[$code] ) ? $messages[$code] : $messages['failed'];
+    }
+    private static function redirect_to_saved_form( $post_id, $error = '' ) {
+        $id = get_post_meta( $post_id, self::META_ID, true );
+        $url = self::configured_url( 'form' );
+        if ( $url && $id ) {
+            $args = array( 'record' => $id );
+            if ( $error ) { $args['gob_photo_error'] = $error; }
+            else { $args['gob_saved'] = 1; }
+            wp_safe_redirect( add_query_arg( $args, $url ), 303 );
+        } else {
+            wp_safe_redirect( admin_url( 'post.php?post=' . $post_id . '&action=edit' ), 303 );
+        }
+        exit;
+    }
     public static function shortcode_form() {
         if ( $denied = self::access() ) { return $denied; }
         if ( ! current_user_can( 'edit_posts' ) ) { return '<p>You cannot create census records.</p>'; }
@@ -359,6 +400,10 @@ final class Guild_Census {
         $loc_id = ! is_wp_error( $selected ) && $selected ? (int) $selected[0] : 0;
         ob_start(); echo '<section class="gob-census gob-form"><h2>' . ( $post ? 'Edit census entry' : 'New census entry' ) . '</h2>';
         if ( isset( $_GET['gob_saved'] ) ) { echo '<p role="status">Record saved.</p>'; }
+        if ( isset( $_GET['gob_photo_error'] ) ) {
+            $code = sanitize_key( wp_unslash( $_GET['gob_photo_error'] ) );
+            echo '<p role="alert"><strong>' . esc_html( self::photo_upload_message( $code ) ) . '</strong> You can choose a smaller photograph below and save again. Your existing name, notes and location are retained.</p>';
+        }
         if ( $post ) { echo '<p>Permanent ID: <strong>' . esc_html( $id ) . '</strong></p>'; }
         echo '<form action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" method="post" enctype="multipart/form-data">';
         echo '<input type="hidden" name="action" value="gob_save_item"><input type="hidden" name="gob_post_id" value="' . esc_attr( $post ? $post->ID : 0 ) . '">';
@@ -366,7 +411,12 @@ final class Guild_Census {
         echo '<p><label for="gob-name">Name (required)</label><br><input required id="gob-name" name="gob_name" maxlength="200" value="' . esc_attr( $post ? $post->post_title : '' ) . '"></p>';
         echo '<p><label for="gob-photo">' . ( $post && has_post_thumbnail( $post->ID ) ? 'Replace primary photo' : 'Primary photograph' ) . '</label>';
         if ( $post && has_post_thumbnail( $post->ID ) ) { echo get_the_post_thumbnail( $post->ID, 'thumbnail' ); }
-        echo '<br><input id="gob-photo" name="gob_photo" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*" capture="environment"></p>';
+        $max_bytes = self::photo_max_bytes();
+        echo '<br><input id="gob-photo" name="gob_photo" type="file" accept="image/*"></p>';
+        echo '<p>To avoid losing a camera photograph if an upload fails, take it in the Camera app first, then select it from Photos. Do not rely on a photograph taken only within this form.</p>';
+        if ( $max_bytes ) { echo '<p>Maximum photograph upload: ' . esc_html( size_format( $max_bytes, 1 ) ) . ' (server limit). Choose a smaller image if necessary.</p>'; }
+        echo '<p id="gob-photo-warning" role="alert" hidden></p>';
+        echo '<script>(function(){var f=document.getElementById("gob-photo"),w=document.getElementById("gob-photo-warning");if(!f||!w)return;var form=f.form;var max=' . (int) $max_bytes . ';function check(){var file=f.files&&f.files[0];if(max&&file&&file.size>max){w.textContent="This photograph is larger than the server limit ("+Math.round(max/1048576*10)/10+" MB). It has not been uploaded. Choose a smaller photograph before saving.";w.hidden=false;return false;}w.textContent="";w.hidden=true;return true;}f.addEventListener("change",check);form.addEventListener("submit",function(e){if(!check()){e.preventDefault();f.focus();}});})();</script>';
         echo '<p><label for="gob-location">Storage location</label><br><select id="gob-location" name="gob_location"><option value="0">— Not recorded —</option>';
         if ( ! is_wp_error( $locations ) ) { foreach ( $locations as $loc ) {
             echo '<option value="' . esc_attr( $loc->term_id ) . '" ' . selected( $loc_id, $loc->term_id, false ) . '>' . esc_html( self::term_path( $loc, 'gob_location' ) ) . '</option>';
@@ -390,19 +440,25 @@ final class Guild_Census {
         $location = isset( $_POST['gob_location'] ) ? absint( $_POST['gob_location'] ) : 0;
         if ( $location && term_exists( $location, 'gob_location' ) ) { wp_set_object_terms( $post_id, array( $location ), 'gob_location' ); }
         else { wp_set_object_terms( $post_id, array(), 'gob_location' ); }
-        if ( ! empty( $_FILES['gob_photo']['name'] ) ) {
-            if ( ! current_user_can( 'upload_files' ) ) { wp_die( 'Photo upload permission required.', '', array( 'response' => 403 ) ); }
+        $photo = isset( $_FILES['gob_photo'] ) && is_array( $_FILES['gob_photo'] ) ? $_FILES['gob_photo'] : array();
+        $upload_error = isset( $photo['error'] ) ? (int) $photo['error'] : UPLOAD_ERR_NO_FILE;
+        if ( UPLOAD_ERR_NO_FILE !== $upload_error ) {
+            if ( ! current_user_can( 'upload_files' ) ) { self::redirect_to_saved_form( $post_id, 'permission' ); }
+            if ( UPLOAD_ERR_INI_SIZE === $upload_error || UPLOAD_ERR_FORM_SIZE === $upload_error ) { self::redirect_to_saved_form( $post_id, 'size' ); }
+            if ( UPLOAD_ERR_PARTIAL === $upload_error ) { self::redirect_to_saved_form( $post_id, 'partial' ); }
+            if ( UPLOAD_ERR_OK !== $upload_error ) { self::redirect_to_saved_form( $post_id, 'failed' ); }
+            if ( ! empty( $photo['size'] ) && self::photo_max_bytes() && (int) $photo['size'] > self::photo_max_bytes() ) { self::redirect_to_saved_form( $post_id, 'size' ); }
             require_once ABSPATH . 'wp-admin/includes/image.php';
             require_once ABSPATH . 'wp-admin/includes/file.php';
             require_once ABSPATH . 'wp-admin/includes/media.php';
             $attachment_id = media_handle_upload( 'gob_photo', $post_id, array(), array( 'test_form' => false, 'mimes' => array( 'jpg|jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'heic' => 'image/heic', 'heif' => 'image/heif' ) ) );
-            if ( is_wp_error( $attachment_id ) ) { wp_die( 'Record saved but photograph upload failed: ' . esc_html( $attachment_id->get_error_message() ), '', array( 'response' => 400 ) ); }
+            if ( is_wp_error( $attachment_id ) ) { self::redirect_to_saved_form( $post_id, 'failed' ); }
             set_post_thumbnail( $post_id, $attachment_id );
         }
         $id = get_post_meta( $post_id, self::META_ID, true );
         $url = self::record_url( $id );
-        if ( ! $url ) { $url = self::configured_url( 'form' ); $url = $url ? add_query_arg( array( 'record' => $id, 'gob_saved' => 1 ), $url ) : admin_url( 'post.php?post=' . $post_id . '&action=edit' ); }
-        wp_safe_redirect( $url ); exit;
+        if ( ! $url ) { self::redirect_to_saved_form( $post_id ); }
+        wp_safe_redirect( $url, 303 ); exit;
     }
 }
 Guild_Census::boot();
