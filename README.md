@@ -1,17 +1,17 @@
-# Guild Census v0.1.0
+# Guild Census v0.1.1
 
 First installation milestone. No external libraries, hosted assets, tracking or third-party accounts.
 
 ## Installation
 
 1. Back up / test on a fresh private WordPress installation (PHP 8.0+).
-2. Upload `guild-census.zip` through **Plugins → Add New → Upload Plugin**, and activate it.
+2. Upload `guild-census-v0.1.1.zip` through **Plugins → Add New → Upload Plugin**, and activate it.
 3. Under **Settings → Permalinks**, choose **Post name** (`/%postname%/`) and **Save Changes**.
 4. Under **Pages → Add New**, create and **publish** these three *real WordPress Pages* (Shortcode block, not Code block):
    - `Census` — slug `census` — shortcode `[gob_census]`
    - `Census entry` — slug `census-entry` — shortcode `[gob_entry]`
    - `Add / edit census entry` — slug `census-edit` — shortcode `[gob_form]`
-5. Under **Guild Census → Page settings**, select the correct Page for each function and save.
+5. Under **Guild Census → Page settings**, follow the five-column mapping table. Select **Census** next to **Catalogue / search**, **Census entry** next to **Individual record**, and **Add / edit census entry** next to **Add / edit form**. Click **Save page settings**. A **Ready** check appears next to a correctly configured published Page after saving. If you chose different Page titles, match them by their shortcodes, not their titles.
 6. Under **Guild Census → Storage locations**, add your preferred locations; optionally add **Item types** and **Sets**.
 7. Visit `/census/` logged in. Use the **Add census entry** link to create an entry. Records also appear at **Guild Census → Census records** in wp-admin.
 
@@ -72,3 +72,9 @@ The plugin does **not** create or rename any files based on census IDs. Original
 - Test the *direct photo URL* while logged out / in private browsing: your web server should challenge for credentials, not display the image.
 - Check WP admin editing and image thumbnails still function behind cPanel HTTP Basic Authentication.
 - Back up the WordPress database and Media Library together.
+
+## Presentation policy (v0.1.1 onward)
+
+The plugin deliberately enqueues **no frontend CSS**, sets no colours, font sizes, card borders, image cropping or layout grids, and uses ordinary HTML elements and native WordPress thumbnails. Presentation comes from the active WordPress theme. The list has non-visual CSS class hooks (`gob-record-list`, `gob-record`) should you ever want to style it in the theme, but the plugin applies no styling to them. Actual HTML form controls still depend on your theme's styles.
+
+This update does not change the database, URLs, page assignment IDs, census records or images. Updating the plugin from v0.1.0 retains all settings.

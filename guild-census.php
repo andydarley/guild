@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Guild Census
  * Description: Private, WordPress-based census foundation with real frontend Pages and a simple mobile entry form.
- * Version: 0.1.0
+ * Version: 0.1.1
  * Requires at least: 6.4
  * Requires PHP: 8.0
  * Author: Guild Census Project
@@ -11,7 +11,7 @@
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 final class Guild_Census {
-    const VERSION = '0.1.0';
+    const VERSION = '0.1.1';
     const CPT = 'gob_item';
     const OPT_PAGES = 'gob_census_pages';
     const OPT_COUNTER = 'gob_census_counter';
@@ -29,7 +29,6 @@ final class Guild_Census {
         add_shortcode( 'gob_entry', array( __CLASS__, 'shortcode_entry' ) );
         add_shortcode( 'gob_form', array( __CLASS__, 'shortcode_form' ) );
         add_action( 'admin_post_gob_save_item', array( __CLASS__, 'save_frontend_item' ) );
-        add_action( 'wp_enqueue_scripts', array( __CLASS__, 'styles' ) );
     }
     public static function activate() {
         self::register_content();
@@ -104,16 +103,41 @@ final class Guild_Census {
     public static function settings_page() {
         if ( ! current_user_can( 'manage_options' ) ) { wp_die( 'Access denied.' ); }
         $saved = get_option( self::OPT_PAGES, array() );
-        $rows = array( 'catalogue' => array( 'Catalogue / search', '[gob_census]' ), 'entry' => array( 'Individual record', '[gob_entry]' ), 'form' => array( 'Add / edit form', '[gob_form]' ) );
-        echo '<div class="wrap"><h1>Guild Census — page settings</h1><p>Create three ordinary published WordPress Pages, each containing its shortcode block. Select them below. Page slugs are yours to choose.</p>';
+        $rows = array(
+            'catalogue' => array( '1. Census catalogue / search', 'Census', 'census', '[gob_census]', 'Shows the searchable list of census records.' ),
+            'entry' => array( '2. Individual record view', 'Census entry', 'census-entry', '[gob_entry]', 'Displays one record, selected by the record ID in its URL.' ),
+            'form' => array( '3. Add / edit record', 'Add / edit census entry', 'census-edit', '[gob_form]', 'Displays the form for creating or editing a record.' ),
+        );
+        echo '<div class="wrap"><h1>Guild Census — page settings</h1>';
+        echo '<p><strong>First create and publish three ordinary WordPress Pages.</strong> Go to <a href="' . esc_url( admin_url( 'edit.php?post_type=page' ) ) . '">Pages</a>, add one <strong>Shortcode block</strong> to each Page, and paste the exact shortcode shown below. Then return here and choose the corresponding Page in each dropdown.</p>';
+        echo '<p>The names and URL slugs are suggestions, not requirements. The <strong>shortcode and matching dropdown selection</strong> are what connect the pages. There is no need to create a WordPress Page for each bear.</p>';
         echo '<form method="post" action="options.php">'; settings_fields( 'gob_page_settings' );
-        echo '<table class="form-table"><tbody>';
+        echo '<table class="widefat striped"><thead><tr><th>Plugin function</th><th>Suggested Page to create</th><th>Exact shortcode to insert</th><th>Choose the Page you created</th><th>Check</th></tr></thead><tbody>';
         foreach ( $rows as $key => $row ) {
-            echo '<tr><th scope="row">' . esc_html( $row[0] ) . '</th><td>';
-            wp_dropdown_pages( array( 'name' => self::OPT_PAGES . '[' . $key . ']', 'selected' => isset( $saved[$key] ) ? absint( $saved[$key] ) : 0, 'show_option_none' => '— Select Page —', 'option_none_value' => '0' ) );
-            echo '<p class="description">Put <code>' . esc_html( $row[1] ) . '</code> into a Shortcode block on this Page.</p></td></tr>';
+            $selected_id = isset( $saved[$key] ) ? absint( $saved[$key] ) : 0;
+            echo '<tr><th scope="row">' . esc_html( $row[0] ) . '<p class="description">' . esc_html( $row[4] ) . '</p></th>';
+            echo '<td><strong>' . esc_html( $row[1] ) . '</strong><p class="description">Suggested slug: <code>' . esc_html( $row[2] ) . '</code></p></td>';
+            echo '<td><code>' . esc_html( $row[3] ) . '</code></td><td>';
+            wp_dropdown_pages( array( 'name' => self::OPT_PAGES . '[' . $key . ']', 'selected' => $selected_id, 'show_option_none' => '— Select the matching Page —', 'option_none_value' => '0' ) );
+            echo '</td><td>';
+            if ( ! $selected_id ) {
+                echo '<span>Not assigned</span>';
+            } else {
+                $page = get_post( $selected_id );
+                $body = $page ? $page->post_content : '';
+                // Page shortcode blocks are stored as shortcode text in post_content.
+                if ( $page && 'publish' !== $page->post_status ) {
+                    echo '<strong>Page is not published</strong>';
+                } elseif ( ! has_shortcode( $body, trim( $row[3], '[]' ) ) ) {
+                    echo '<strong>Shortcode not detected — check the Page</strong>';
+                } else {
+                    echo '<strong>Ready</strong> — <a href="' . esc_url( get_permalink( $selected_id ) ) . '" target="_blank" rel="noopener">View Page</a>';
+                }
+            }
+            echo '</td></tr>';
         }
-        echo '</tbody></table>'; submit_button( 'Save page settings' ); echo '</form></div>';
+        echo '</tbody></table>'; submit_button( 'Save page settings' );
+        echo '</form><p><strong>Important:</strong> the Check column reflects saved selections. After changing dropdowns, click Save page settings to update the checks. For friendly URLs, select <strong>Post name</strong> under <a href="' . esc_url( admin_url( 'options-permalink.php' ) ) . '">Settings → Permalinks</a>.</p></div>';
     }
     public static function add_meta_boxes() {
         add_meta_box( 'gob_identity', 'Guild Census identity', array( __CLASS__, 'identity_box' ), self::CPT, 'side', 'high' );
@@ -153,11 +177,6 @@ final class Guild_Census {
     public static function column_value( $column, $post_id ) {
         if ( 'gob_id' === $column ) { echo esc_html( get_post_meta( $post_id, self::META_ID, true ) ); }
     }
-    public static function styles() {
-        if ( is_page() ) {
-            wp_enqueue_style( 'gob-census', plugins_url( 'assets/census.css', __FILE__ ), array(), self::VERSION );
-        }
-    }
     private static function access() {
         if ( ! is_user_logged_in() ) {
             return '<div class="gob-census"><p>This census requires a login. <a href="' . esc_url( wp_login_url( get_permalink() ) ) . '">Log in</a></p></div>';
@@ -184,19 +203,19 @@ final class Guild_Census {
         ob_start();
         echo '<section class="gob-census"><h2>Census catalogue</h2><form method="get" class="gob-search" action="' . esc_url( get_permalink() ) . '"><label for="gob-q">Search by name or ID</label><input type="search" id="gob-q" name="gob_q" value="' . esc_attr( $search ) . '"><button type="submit">Search</button></form>';
         $form_url = self::configured_url( 'form' );
-        if ( current_user_can( 'edit_posts' ) && $form_url ) { echo '<p><a class="gob-button" href="' . esc_url( $form_url ) . '">Add census entry</a></p>'; }
+        if ( current_user_can( 'edit_posts' ) && $form_url ) { echo '<p><a href="' . esc_url( $form_url ) . '">Add census entry</a></p>'; }
         if ( ! $q->have_posts() ) { echo '<p>No matching records.</p>'; }
         else {
-            echo '<div class="gob-grid">';
+            echo '<ul class="gob-record-list">';
             while ( $q->have_posts() ) { $q->the_post();
                 $id = get_post_meta( get_the_ID(), self::META_ID, true );
                 $link = self::record_url( $id );
-                echo '<article class="gob-card">';
+                echo '<li class="gob-record">';
                 if ( has_post_thumbnail() ) { echo $link ? '<a href="' . esc_url( $link ) . '">' : ''; echo get_the_post_thumbnail( get_the_ID(), 'medium', array( 'loading' => 'lazy' ) ); echo $link ? '</a>' : ''; }
-                else { echo '<div class="gob-placeholder">No photograph</div>'; }
-                echo '<h3>' . ( $link ? '<a href="' . esc_url( $link ) . '">' : '' ) . esc_html( get_the_title() ) . ( $link ? '</a>' : '' ) . '</h3><p>' . esc_html( $id ) . '</p></article>';
+                else { echo '<p>No photograph</p>'; }
+                echo '<h3>' . ( $link ? '<a href="' . esc_url( $link ) . '">' : '' ) . esc_html( get_the_title() ) . ( $link ? '</a>' : '' ) . '</h3><p>' . esc_html( $id ) . '</p></li>';
             }
-            echo '</div>';
+            echo '</ul>';
             if ( $q->max_num_pages > 1 ) {
                 echo '<nav class="gob-pages" aria-label="Census pages">';
                 for ( $i = 1; $i <= min( 100, $q->max_num_pages ); $i++ ) {
@@ -224,7 +243,7 @@ final class Guild_Census {
             $names = wp_get_post_terms( $post->ID, $tax, array( 'fields' => 'names' ) );
             if ( ! is_wp_error( $names ) && $names ) { echo '<p><strong>' . esc_html( $label ) . ':</strong> ' . esc_html( implode( ', ', $names ) ) . '</p>'; }
         }
-        if ( current_user_can( 'edit_post', $post->ID ) && $form ) { echo '<p><a class="gob-button" href="' . esc_url( add_query_arg( 'record', $id, $form ) ) . '">Edit record</a></p>'; }
+        if ( current_user_can( 'edit_post', $post->ID ) && $form ) { echo '<p><a href="' . esc_url( add_query_arg( 'record', $id, $form ) ) . '">Edit record</a></p>'; }
         echo '</article>'; return ob_get_clean();
     }
     public static function shortcode_form() {
@@ -238,21 +257,21 @@ final class Guild_Census {
         $selected = $post ? wp_get_post_terms( $post->ID, 'gob_location', array( 'fields' => 'ids' ) ) : array();
         $loc_id = ! is_wp_error( $selected ) && $selected ? (int) $selected[0] : 0;
         ob_start(); echo '<section class="gob-census gob-form"><h2>' . ( $post ? 'Edit census entry' : 'New census entry' ) . '</h2>';
-        if ( isset( $_GET['gob_saved'] ) ) { echo '<p class="gob-notice">Record saved.</p>'; }
+        if ( isset( $_GET['gob_saved'] ) ) { echo '<p role="status">Record saved.</p>'; }
         if ( $post ) { echo '<p>Permanent ID: <strong>' . esc_html( $id ) . '</strong></p>'; }
         echo '<form action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" method="post" enctype="multipart/form-data">';
         echo '<input type="hidden" name="action" value="gob_save_item"><input type="hidden" name="gob_post_id" value="' . esc_attr( $post ? $post->ID : 0 ) . '">';
         wp_nonce_field( 'gob_save_item', 'gob_nonce' );
-        echo '<label for="gob-name">Name <span aria-hidden="true">*</span></label><input required id="gob-name" name="gob_name" maxlength="200" value="' . esc_attr( $post ? $post->post_title : '' ) . '">';
-        echo '<label for="gob-photo">' . ( $post && has_post_thumbnail( $post->ID ) ? 'Replace primary photo' : 'Primary photograph' ) . '</label>';
+        echo '<p><label for="gob-name">Name (required)</label><br><input required id="gob-name" name="gob_name" maxlength="200" value="' . esc_attr( $post ? $post->post_title : '' ) . '"></p>';
+        echo '<p><label for="gob-photo">' . ( $post && has_post_thumbnail( $post->ID ) ? 'Replace primary photo' : 'Primary photograph' ) . '</label>';
         if ( $post && has_post_thumbnail( $post->ID ) ) { echo get_the_post_thumbnail( $post->ID, 'thumbnail' ); }
-        echo '<input id="gob-photo" name="gob_photo" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*" capture="environment">';
-        echo '<label for="gob-location">Storage location</label><select id="gob-location" name="gob_location"><option value="0">— Not recorded —</option>';
+        echo '<br><input id="gob-photo" name="gob_photo" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*" capture="environment"></p>';
+        echo '<p><label for="gob-location">Storage location</label><br><select id="gob-location" name="gob_location"><option value="0">— Not recorded —</option>';
         if ( ! is_wp_error( $locations ) ) { foreach ( $locations as $loc ) {
             echo '<option value="' . esc_attr( $loc->term_id ) . '" ' . selected( $loc_id, $loc->term_id, false ) . '>' . esc_html( $loc->name ) . '</option>';
         } }
-        echo '</select><label for="gob-notes">Notes</label><textarea id="gob-notes" name="gob_notes" rows="5">' . esc_textarea( $post ? $post->post_content : '' ) . '</textarea>';
-        echo '<button type="submit">Save record</button></form></section>'; return ob_get_clean();
+        echo '</select></p><p><label for="gob-notes">Notes</label><br><textarea id="gob-notes" name="gob_notes" rows="5">' . esc_textarea( $post ? $post->post_content : '' ) . '</textarea></p>';
+        echo '<p><button type="submit">Save record</button></p></form></section>'; return ob_get_clean();
     }
     public static function save_frontend_item() {
         if ( ! is_user_logged_in() || ! current_user_can( 'edit_posts' ) ) { wp_die( 'Access denied.', '', array( 'response' => 403 ) ); }
