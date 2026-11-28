@@ -3,13 +3,13 @@ defined( 'ABSPATH' ) || exit;
 
 trait Guild_Admin {
     public static function admin_menu() {
-        add_menu_page( 'Guild', 'Guild', 'edit_posts', 'guild', array( __CLASS__, 'dashboard' ), 'dashicons-archive', 26 );
+        add_menu_page( 'Guild', 'Guild', 'edit_posts', 'guild', array( __CLASS__, 'dashboard' ), 'dashicons-pets', 26 );
     }
     private static function tab_url( $tab ) {
         return admin_url( 'admin.php?page=guild&tab=' . rawurlencode( $tab ) );
     }
     private static function tabs() {
-        return array( 'overview' => 'Overview', 'records' => 'Records', 'types' => 'Item types', 'sets' => 'Sets', 'locations' => 'Storage locations', 'pages' => 'Pages' );
+        return array( 'overview' => 'Overview', 'records' => 'Records', 'types' => 'Item types', 'sets' => 'Sets', 'locations' => 'Storage locations', 'transfer' => 'Import / Export', 'pages' => 'Pages' );
     }
     public static function dashboard() {
         if ( ! current_user_can( 'edit_posts' ) ) { wp_die( 'Access denied.' ); }
@@ -17,11 +17,12 @@ trait Guild_Admin {
         if ( ! isset( self::tabs()[$tab] ) ) { $tab = 'overview'; }
         echo '<div class="wrap"><h1>Guild</h1><nav class="nav-tab-wrapper" aria-label="Guild administration">';
         foreach ( self::tabs() as $key => $label ) {
-            if ( 'pages' === $key && ! current_user_can( 'manage_options' ) ) { continue; }
+            if ( in_array( $key, array( 'pages', 'transfer' ), true ) && ! current_user_can( 'manage_options' ) ) { continue; }
             echo '<a class="nav-tab ' . ( $key === $tab ? 'nav-tab-active' : '' ) . '" href="' . esc_url( 'records' === $key ? admin_url( 'edit.php?post_type=' . self::CPT ) : self::tab_url( $key ) ) . '">' . esc_html( $label ) . '</a>';
         }
         echo '</nav>';
         if ( 'pages' === $tab ) { self::settings_page( true ); }
+        elseif ( 'transfer' === $tab ) { self::io_tab(); }
         elseif ( self::taxonomy_for_tab( $tab ) ) { self::terms_tab( $tab ); }
         elseif ( 'records' === $tab ) {
             echo '<p><a href="' . esc_url( admin_url( 'edit.php?post_type=' . self::CPT ) ) . '">View and edit all records</a></p>';
@@ -36,7 +37,7 @@ trait Guild_Admin {
                 echo '<li>' . esc_html( $label ) . ': ' . ( $url ? '<a href="' . esc_url( $url ) . '">' . esc_html( $url ) . '</a>' : '<em>Not configured — visit the Pages tab</em>' ) . '</li>';
             }
             echo '</ul><p><strong>Privacy:</strong> Protect this installation and its Media Library files using cPanel Directory Privacy before uploading real photographs.</p>';
-            echo '<p><strong>Planned:</strong> Excel imports, CSV exports and photographs associated with multiple records.</p>';
+            echo '<p><strong>Available:</strong> Excel import and CSV export are on the Import / Export tab.</p><p><strong>Planned:</strong> Photographs associated with multiple records.</p>';
         }
         echo '</div>';
     }

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Guild
  * Description: Private, WordPress-based catalogue with real frontend Pages and a simple mobile entry form.
- * Version: 0.1.4
+ * Version: 0.1.5
  * Requires at least: 6.4
  * Requires PHP: 8.0
  * Author: Guild of Bears
@@ -16,10 +16,11 @@ require_once __DIR__ . '/includes/taxonomies.php';
 require_once __DIR__ . '/includes/admin.php';
 require_once __DIR__ . '/includes/frontend.php';
 require_once __DIR__ . '/includes/forms.php';
+require_once __DIR__ . '/includes/import-export.php';
 
 final class Guild_Census {
-    use Guild_Post_Types, Guild_Taxonomies, Guild_Admin, Guild_Frontend, Guild_Forms;
-    const VERSION = '0.1.4';
+    use Guild_Post_Types, Guild_Taxonomies, Guild_Admin, Guild_Frontend, Guild_Forms, Guild_Import_Export;
+    const VERSION = '0.1.5';
     const CPT = 'gob_item';
     const OPT_PAGES = 'gob_census_pages';
     const OPT_COUNTER = 'gob_census_counter';
@@ -38,6 +39,9 @@ final class Guild_Census {
         add_shortcode( 'gob_form', array( __CLASS__, 'shortcode_form' ) );
         add_action( 'admin_post_gob_save_item', array( __CLASS__, 'save_frontend_item' ) );
         add_action( 'admin_post_guild_term', array( __CLASS__, 'manage_term' ) );
+        foreach ( array( 'upload', 'batch', 'cancel', 'report', 'export' ) as $operation ) {
+            add_action( 'admin_post_guild_io_' . $operation, array( __CLASS__, 'io_' . $operation ) );
+        }
     }
     public static function activate() {
         self::register_content();
