@@ -1,0 +1,10 @@
+/* Guild: layout only. The active theme owns typography, colour and decoration. */
+.gob-census .gob-record-list { list-style: none; padding-left: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr)); gap: 1.25rem; }
+.gob-census .gob-record { min-width: 0; }
+.gob-census img { display: block; max-width: 100%; height: auto; }
+.gob-census .gob-search { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; }
+.gob-census.gob-form input:not([type="checkbox"]):not([type="file"]), .gob-census.gob-form select, .gob-census.gob-form textarea { max-width: 100%; }
+.gob-census .guild-sets { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
+.gob-census .guild-sets legend { width: 100%; }
+.gob-census .guild-sets label { display: inline-flex; align-items: center; gap: .35rem; }
+.gob-census .gob-pages { display: flex; flex-wrap: wrap; gap: .6rem; }
